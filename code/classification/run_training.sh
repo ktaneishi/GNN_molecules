@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --partition xdg-003-compute
+#SBATCH -p xdg-003-compute2
 
-export OMP_NUM_THREADS=10
+export OMP_NUM_THREADS=20
 export MKL_NUM_THREADS=$OMP_NUM_THREADS
 
 DATASET=HIV
@@ -27,11 +27,9 @@ decay_interval=10
 weight_decay=1e-6
 iteration=300
 
-<<<<<<< HEAD
-decay_interval=50
+iteration=10
 
-iteration=500
-
+echo $SLURM_JOB_NODELIST
 echo $OMP_NUM_THREADS
 setting=$DATASET--radius$radius--update_$update--output_$output--dim$dim--hidden_layer$hidden_layer--output_layer$output_layer--batch$batch--lr$lr--lr_decay$lr_decay--decay_interval$decay_interval--weight_decay$weight_decay--iteration$iteration
 python run_training.py $DATASET $radius $update $output $dim $hidden_layer $output_layer $batch $lr $lr_decay $decay_interval $weight_decay $iteration $setting

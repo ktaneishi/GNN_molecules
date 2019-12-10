@@ -1,14 +1,11 @@
-import pickle
-import sys
-import timeit
-
 import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
+import timeit
+import pickle
+import sys
 
 class GraphNeuralNetwork(nn.Module):
     def __init__(self):
@@ -21,7 +18,7 @@ class GraphNeuralNetwork(nn.Module):
         self.W_property = nn.Linear(dim, 1)
 
     def pad(self, matrices, pad_value):
-        """Pad adjacency matrices for batch processing."""
+        '''Pad adjacency matrices for batch processing.'''
         sizes = [m.shape[0] for m in matrices]
         M = sum(sizes)
         pad_matrices = pad_value + np.zeros((M, M))
@@ -41,9 +38,9 @@ class GraphNeuralNetwork(nn.Module):
         return torch.stack(y)
 
     def update(self, xs, A, M, i):
-        """Update the node vectors in a graph
+        '''Update the node vectors in a graph
         considering their neighboring node vectors (i.e., sum or mean),
-        which are non-linear transformed by neural network."""
+        which are non-linear transformed by neural network.'''
         hs = torch.relu(self.W_fingerprint[i](xs))
         if update == 'sum':
             return xs + torch.matmul(A, hs)
@@ -63,7 +60,7 @@ class GraphNeuralNetwork(nn.Module):
 
         adjacencies = self.pad(adjacencies, 0)
 
-        """GNN updates the fingerprint vectors."""
+        '''GNN updates the fingerprint vectors.'''
         for i in range(hidden_layer):
             fingerprint_vectors = self.update(fingerprint_vectors,
                                               adjacencies, M, i)
@@ -90,8 +87,8 @@ class GraphNeuralNetwork(nn.Module):
             loss = F.mse_loss(correct_properties, predicted_properties)
             return loss
         else:
-            """Transform the normalized property (i.e., mean 0 and std 1)
-            to the unit-based property (e.g., eV and kcal/mol)."""
+            '''Transform the normalized property (i.e., mean 0 and std 1)
+            to the unit-based property (e.g., eV and kcal/mol).'''
             correct_properties, predicted_properties = (
                 correct_properties.to('cpu').data.numpy(),
                 predicted_properties.to('cpu').data.numpy())
@@ -99,7 +96,6 @@ class GraphNeuralNetwork(nn.Module):
                 std * np.concatenate(correct_properties) + mean,
                 std * np.concatenate(predicted_properties) + mean)
             return Smiles, correct_properties, predicted_properties
-
 
 class Trainer(object):
     def __init__(self, model):
@@ -119,7 +115,6 @@ class Trainer(object):
             self.optimizer.step()
             loss_total += loss.to('cpu').data.numpy()
         return loss_total
-
 
 class Tester(object):
     def __init__(self, model):
@@ -154,30 +149,25 @@ class Tester(object):
     def save_model(self, model, filename):
         torch.save(model.state_dict(), filename)
 
-
 def load_tensor(filename, dtype):
     return [dtype(d).to(device) for d in np.load(filename + '.npy')]
 
-
 def load_numpy(filename):
     return np.load(filename + '.npy')
-
 
 def shuffle_dataset(dataset, seed):
     np.random.seed(seed)
     np.random.shuffle(dataset)
     return dataset
 
-
 def split_dataset(dataset, ratio):
     n = int(ratio * len(dataset))
     dataset_1, dataset_2 = dataset[:n], dataset[n:]
     return dataset_1, dataset_2
 
+if __name__ == '__main__':
 
-if __name__ == "__main__":
-
-    """Hyperparameters."""
+    '''Hyperparameters.'''
     (DATASET, radius, update, output, dim, hidden_layer, output_layer, batch,
      lr, lr_decay, decay_interval, weight_decay, iteration,
      setting) = sys.argv[1:]
@@ -186,7 +176,7 @@ if __name__ == "__main__":
                             decay_interval, iteration])
     lr, lr_decay, weight_decay = map(float, [lr, lr_decay, weight_decay])
 
-    """CPU or GPU."""
+    '''CPU or GPU.'''
     if torch.cuda.is_available():
         device = torch.device('cuda')
         print('The code uses GPU...')
@@ -194,7 +184,7 @@ if __name__ == "__main__":
         device = torch.device('cpu')
         print('The code uses CPU!!!')
 
-    """Load each preprocessed data."""
+    '''Load each preprocessed data.'''
     dir_input = ('../../dataset/regression/' + DATASET +
                  '/input/radius' + radius + '/')
     with open(dir_input + 'Smiles.txt') as f:
@@ -208,19 +198,19 @@ if __name__ == "__main__":
         fingerprint_dict = pickle.load(f)
     n_fingerprint = len(fingerprint_dict)
 
-    """Create a dataset and split it into train/dev/test."""
+    '''Create a dataset and split it into train/dev/test.'''
     dataset = list(zip(Smiles, molecules, adjacencies, properties))
     dataset = shuffle_dataset(dataset, 1234)
     dataset_train, dataset_ = split_dataset(dataset, 0.8)
     dataset_dev, dataset_test = split_dataset(dataset_, 0.5)
 
-    """Set a model."""
+    '''Set a model.'''
     torch.manual_seed(1234)
     model = GraphNeuralNetwork().to(device)
     trainer = Trainer(model)
     tester = Tester(model)
 
-    """Output files."""
+    '''Output files.'''
     file_MSEs = '../../output/result/MSEs--' + setting + '.txt'
     file_predictions = '../../output/result/predictions--' + setting + '.txt'
     file_model = '../../output/model/' + setting
@@ -228,7 +218,7 @@ if __name__ == "__main__":
     with open(file_MSEs, 'w') as f:
         f.write(MSEs + '\n')
 
-    """Start training."""
+    '''Start training.'''
     print('Training...')
     print(MSEs)
     start = timeit.default_timer()

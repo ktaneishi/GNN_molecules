@@ -1,7 +1,6 @@
 #!/bin/bash
-#SBATCH -p xdg-003-compute2
 
-export OMP_NUM_THREADS=20
+export OMP_NUM_THREADS=$(nproc --all)
 export MKL_NUM_THREADS=$OMP_NUM_THREADS
 
 DATASET=HIV

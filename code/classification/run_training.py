@@ -167,11 +167,11 @@ class Tester(object):
 
 
 def load_tensor(filename, dtype):
-    return [dtype(d).to(device) for d in np.load(filename + '.npy')]
+    return [dtype(d).to(device) for d in np.load(filename + '.npy', allow_pickle=True)]
 
 
 def load_numpy(filename):
-    return np.load(filename + '.npy')
+    return np.load(filename + '.npy', allow_pickle=True)
 
 
 def shuffle_dataset(dataset, seed):

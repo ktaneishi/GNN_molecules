@@ -1,8 +1,5 @@
 #!/bin/bash
 
-export OMP_NUM_THREADS=$(nproc --all)
-export MKL_NUM_THREADS=$OMP_NUM_THREADS
-
 DATASET=HIV
 # DATASET=yourdata
 
@@ -28,7 +25,5 @@ iteration=300
 
 iteration=10
 
-echo $SLURM_JOB_NODELIST
-echo $OMP_NUM_THREADS
 setting=$DATASET--radius$radius--update_$update--output_$output--dim$dim--hidden_layer$hidden_layer--output_layer$output_layer--batch$batch--lr$lr--lr_decay$lr_decay--decay_interval$decay_interval--weight_decay$weight_decay--iteration$iteration
 python run_training.py $DATASET $radius $update $output $dim $hidden_layer $output_layer $batch $lr $lr_decay $decay_interval $weight_decay $iteration $setting

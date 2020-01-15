@@ -1,16 +1,17 @@
-from collections import defaultdict
-import os
-import pickle
-import sys
-
+# %%
 import numpy as np
+from collections import defaultdict
+from tqdm import tqdm
+import pickle
+import os
 
+# %%
 from rdkit import Chem
 
 
+# %%
 def create_atoms(mol):
-    """Create a list of atom (e.g., hydrogen and oxygen) IDs
-    considering the aromaticity."""
+    '''Create a list of atom (e.g., hydrogen and oxygen) IDs considering the aromaticity.'''
     atoms = [a.GetSymbol() for a in mol.GetAtoms()]
     for a in mol.GetAromaticAtoms():
         i = a.GetIdx()
@@ -19,10 +20,11 @@ def create_atoms(mol):
     return np.array(atoms)
 
 
+# %%
 def create_ijbonddict(mol):
-    """Create a dictionary, which each key is a node ID
+    '''Create a dictionary, which each key is a node ID
     and each value is the tuples of its neighboring node
-    and bond (e.g., single and double) IDs."""
+    and bond (e.g., single and double) IDs.'''
     i_jbond_dict = defaultdict(lambda: [])
     for b in mol.GetBonds():
         i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
@@ -32,9 +34,10 @@ def create_ijbonddict(mol):
     return i_jbond_dict
 
 
+# %%
 def extract_fingerprints(atoms, i_jbond_dict, radius):
-    """Extract the r-radius subgraphs (i.e., fingerprints)
-    from a molecular graph using Weisfeiler-Lehman algorithm."""
+    '''Extract the r-radius subgraphs (i.e., fingerprints)
+    from a molecular graph using Weisfeiler-Lehman algorithm.'''
 
     if (len(atoms) == 1) or (radius == 0):
         fingerprints = [fingerprint_dict[a] for a in atoms]
@@ -45,8 +48,8 @@ def extract_fingerprints(atoms, i_jbond_dict, radius):
 
         for _ in range(radius):
 
-            """Update each node ID considering its neighboring nodes and edges
-            (i.e., r-radius subgraphs or fingerprints)."""
+            '''Update each node ID considering its neighboring nodes and edges
+            (i.e., r-radius subgraphs or fingerprints).'''
             fingerprints = []
             for i, j_edge in i_jedge_dict.items():
                 neighbors = [(nodes[j], edge) for j, edge in j_edge]
@@ -54,8 +57,8 @@ def extract_fingerprints(atoms, i_jbond_dict, radius):
                 fingerprints.append(fingerprint_dict[fingerprint])
             nodes = fingerprints
 
-            """Also update each edge ID considering two nodes
-            on its both sides."""
+            '''Also update each edge ID considering two nodes
+            on its both sides.'''
             _i_jedge_dict = defaultdict(lambda: [])
             for i, j_edge in i_jedge_dict.items():
                 for j, edge in j_edge:
@@ -67,40 +70,37 @@ def extract_fingerprints(atoms, i_jbond_dict, radius):
     return np.array(fingerprints)
 
 
+# %%
 def create_adjacency(mol):
     adjacency = Chem.GetAdjacencyMatrix(mol)
     return np.array(adjacency)
 
 
+# %%
 def dump_dictionary(dictionary, filename):
     with open(filename, 'wb') as f:
         pickle.dump(dict(dictionary), f)
 
 
-if __name__ == "__main__":
+# %%
+def main():
+    DATASET = 'HIV'
+    # DATASET = yourdata
 
-    DATASET, radius = sys.argv[1:]
-    radius = int(radius)
+    # radius=0  # w/o fingerprints (i.e., atoms).
+    # radius=1
+    radius=2
+    # radius=3
 
-    with open('../../dataset/classification/' + DATASET +
-              '/original/data.txt', 'r') as f:
+    with open('../../dataset/classification/%s/original/data.txt' % DATASET, 'r') as f:
         data_list = f.read().strip().split('\n')
 
-    """Exclude data contains '.' in the SMILES format."""
+    '''Exclude data contains '.' in the SMILES format.'''
     data_list = [d for d in data_list if '.' not in d.strip().split()[0]]
-    N = len(data_list)
-
-    atom_dict = defaultdict(lambda: len(atom_dict))
-    bond_dict = defaultdict(lambda: len(bond_dict))
-    fingerprint_dict = defaultdict(lambda: len(fingerprint_dict))
-    edge_dict = defaultdict(lambda: len(edge_dict))
-
+    
     Smiles, molecules, adjacencies, properties = '', [], [], []
 
-    for no, data in enumerate(data_list):
-
-        print('/'.join(map(str, [no+1, N])))
-
+    for data in tqdm(data_list):
         smiles, property = data.strip().split()
         Smiles += smiles + '\n'
 
@@ -116,15 +116,26 @@ if __name__ == "__main__":
 
         properties.append(np.array([float(property)]))
 
-    dir_input = ('../../dataset/classification/' + DATASET +
-                 '/input/radius' + str(radius) + '/')
+    dir_input = '../../dataset/classification/%s/input/radius%d/' % (DATASET, radius)
     os.makedirs(dir_input, exist_ok=True)
 
     with open(dir_input + 'Smiles.txt', 'w') as f:
         f.write(Smiles)
-    np.save(dir_input + 'molecules', molecules)
-    np.save(dir_input + 'adjacencies', adjacencies)
-    np.save(dir_input + 'properties', properties)
-    dump_dictionary(fingerprint_dict, dir_input + 'fingerprint_dict.pickle')
+    np.save(os.path.join(dir_input, 'molecules'), molecules)
+    np.save(os.path.join(dir_input, 'adjacencies'), adjacencies)
+    np.save(os.path.join(dir_input, 'properties'), properties)
+    dump_dictionary(fingerprint_dict, os.path.join(dir_input, 'fingerprint_dict.pkl'))
 
-    print('The preprocess of ' + DATASET + ' dataset has finished!')
+    print('The preprocess of %s dataset has finished!' % DATASET)
+
+
+# %%
+if __name__ == '__main__':
+    atom_dict = defaultdict(lambda: len(atom_dict))
+    bond_dict = defaultdict(lambda: len(bond_dict))
+    fingerprint_dict = defaultdict(lambda: len(fingerprint_dict))
+    edge_dict = defaultdict(lambda: len(edge_dict))
+
+    main()
+
+# %%

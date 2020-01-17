@@ -1,18 +1,24 @@
+# %%
 import sys
 import timeit
 
+# %%
 import numpy as np
 
+# %%
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+# %%
 from sklearn.metrics import roc_auc_score
 
+# %%
 import preprocess as pp
 
 
+# %%
 class MolecularGraphNeuralNetwork(nn.Module):
     def __init__(self, N_fingerprints, dim, layer_hidden, layer_output):
         super(MolecularGraphNeuralNetwork, self).__init__()
@@ -27,10 +33,8 @@ class MolecularGraphNeuralNetwork(nn.Module):
             self.W_property = nn.Linear(dim, 1)
 
     def pad(self, matrices, pad_value):
-        """Pad the list of matrices
-        with a pad_value (e.g., 0) for batch processing.
-        For example, given a list of matrices [A, B, C],
-        we obtain a new matrix [A00, 0B0, 00C],
+        """Pad the list of matrices with a pad_value (e.g., 0) for batch processing.
+        For example, given a list of matrices [A, B, C], we obtain a new matrix [A00, 0B0, 00C],
         where 0 is the zero (i.e., pad value) matrix.
         """
         shapes = [m.shape for m in matrices]
@@ -84,7 +88,6 @@ class MolecularGraphNeuralNetwork(nn.Module):
         return outputs
 
     def forward_classifier(self, data_batch, train):
-
         inputs = data_batch[:-1]
         correct_labels = torch.cat(data_batch[-1])
 
@@ -103,7 +106,6 @@ class MolecularGraphNeuralNetwork(nn.Module):
             return predicted_scores, correct_labels
 
     def forward_regressor(self, data_batch, train):
-
         inputs = data_batch[:-1]
         correct_values = torch.cat(data_batch[-1])
 
@@ -123,6 +125,7 @@ class MolecularGraphNeuralNetwork(nn.Module):
             return predicted_values, correct_values
 
 
+# %%
 class Trainer(object):
     def __init__(self, model):
         self.model = model
@@ -145,6 +148,7 @@ class Trainer(object):
         return loss_total
 
 
+# %%
 class Tester(object):
     def __init__(self, model):
         self.model = model
@@ -177,47 +181,53 @@ class Tester(object):
             f.write(result + '\n')
 
 
-if __name__ == "__main__":
+# %%
+def main():
+    #task=classification  # target is a binary value (e.g., drug or not).
+    #dataset=hiv
 
-    (task, dataset, radius, dim, layer_hidden, layer_output,
-     batch_train, batch_test, lr, lr_decay, decay_interval, iteration,
-     setting) = sys.argv[1:]
-    (radius, dim, layer_hidden, layer_output,
-     batch_train, batch_test, decay_interval,
-     iteration) = map(int, [radius, dim, layer_hidden, layer_output,
-                            batch_train, batch_test,
-                            decay_interval, iteration])
-    lr, lr_decay = map(float, [lr, lr_decay])
+    task = 'regression'  # target is a real value (e.g., energy eV).
+    dataset = 'photovoltaic'
 
+    radius = 1
+    dim = 50
+    layer_hidden = 6
+    layer_output = 6
+
+    batch_train = 32
+    batch_test = 32
+    lr = 1e-4
+    lr_decay = 0.99
+    decay_interval = 10
+    iteration = 1000
+
+    setting = 'default'
+    
     if torch.cuda.is_available():
         device = torch.device('cuda')
         print('The code uses a GPU!')
     else:
         device = torch.device('cpu')
         print('The code uses a CPU...')
-    print('-'*100)
+    print('-' * 100)
 
     print('Preprocessing the', dataset, 'dataset.')
     print('Just a moment......')
-    (dataset_train, dataset_dev, dataset_test,
-     N_fingerprints) = pp.create_datasets(task, dataset, radius, device)
-    print('-'*100)
+    (dataset_train, dataset_dev, dataset_test, N_fingerprints) = pp.create_datasets(task, dataset, radius, device)
+    print('-' * 100)
 
     print('The preprocess has finished!')
     print('# of training data samples:', len(dataset_train))
     print('# of development data samples:', len(dataset_dev))
     print('# of test data samples:', len(dataset_test))
-    print('-'*100)
+    print('-' * 100)
 
     print('Creating a model.')
-    torch.manual_seed(1234)
-    model = MolecularGraphNeuralNetwork(
-            N_fingerprints, dim, layer_hidden, layer_output).to(device)
+    model = MolecularGraphNeuralNetwork(N_fingerprints, dim, layer_hidden, layer_output).to(device)
     trainer = Trainer(model)
     tester = Tester(model)
-    print('# of model parameters:',
-          sum([np.prod(p.size()) for p in model.parameters()]))
-    print('-'*100)
+    print('# of model parameters:', sum([np.prod(p.size()) for p in model.parameters()]))
+    print('-' * 100)
 
     file_result = '../output/result--' + setting + '.txt'
     if task == 'classification':
@@ -231,12 +241,9 @@ if __name__ == "__main__":
     print('Start training.')
     print('The result is saved in the output directory every epoch!')
 
-    np.random.seed(1234)
-
     start = timeit.default_timer()
 
     for epoch in range(iteration):
-
         epoch += 1
         if epoch % decay_interval == 0:
             trainer.optimizer.param_groups[0]['lr'] *= lr_decay
@@ -256,13 +263,20 @@ if __name__ == "__main__":
             minutes = time * iteration / 60
             hours = int(minutes / 60)
             minutes = int(minutes - 60 * hours)
-            print('The training will finish in about',
-                  hours, 'hours', minutes, 'minutes.')
-            print('-'*100)
+            print('The training will finish in about', hours, 'hours', minutes, 'minutes.')
+            print('-' * 100)
             print(result)
 
-        result = '\t'.join(map(str, [epoch, time, loss_train,
-                                     prediction_dev, prediction_test]))
+        result = '\t'.join(map(str, [epoch, time, loss_train, prediction_dev, prediction_test]))
         tester.save_result(result, file_result)
 
         print(result)
+
+
+# %%
+if __name__ == "__main__":
+    np.random.seed(123)
+    torch.manual_seed(123)
+    main()
+
+# %%

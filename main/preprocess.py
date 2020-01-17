@@ -1,12 +1,15 @@
+# %%
+import numpy as np
 from collections import defaultdict
 
-import numpy as np
-
+# %%
 from rdkit import Chem
 
+# %%
 import torch
 
 
+# %%
 def create_atoms(mol, atom_dict):
     """Transform the atom types in a molecule (e.g., H, C, and O)
     into the indices (e.g., H=0, C=1, and O=2).
@@ -20,6 +23,7 @@ def create_atoms(mol, atom_dict):
     return np.array(atoms)
 
 
+# %%
 def create_ijbonddict(mol, bond_dict):
     """Create a dictionary, in which each key is a node ID
     and each value is the tuples of its neighboring node
@@ -34,6 +38,7 @@ def create_ijbonddict(mol, bond_dict):
     return i_jbond_dict
 
 
+# %%
 def extract_fingerprints(radius, atoms, i_jbond_dict,
                          fingerprint_dict, edge_dict):
     """Extract the fingerprints from a molecular graph
@@ -74,6 +79,7 @@ def extract_fingerprints(radius, atoms, i_jbond_dict,
     return np.array(nodes)
 
 
+# %%
 def split_dataset(dataset, ratio):
     """Shuffle and split a dataset."""
     np.random.seed(1234)  # fix the seed for shuffle.
@@ -82,6 +88,7 @@ def split_dataset(dataset, ratio):
     return dataset[:n], dataset[n:]
 
 
+# %%
 def create_datasets(task, dataset, radius, device):
 
     dir_dataset = '../dataset/' + task + '/' + dataset + '/'
@@ -143,3 +150,5 @@ def create_datasets(task, dataset, radius, device):
     N_fingerprints = len(fingerprint_dict)
 
     return dataset_train, dataset_dev, dataset_test, N_fingerprints
+
+# %%

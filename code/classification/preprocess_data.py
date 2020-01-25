@@ -1,15 +1,10 @@
-# %%
 import numpy as np
 from collections import defaultdict
-from tqdm import tqdm
 import pickle
 import os
 
-# %%
 from rdkit import Chem
 
-
-# %%
 def create_atoms(mol):
     '''Create a list of atom (e.g., hydrogen and oxygen) IDs considering the aromaticity.'''
     atoms = [a.GetSymbol() for a in mol.GetAtoms()]
@@ -19,8 +14,6 @@ def create_atoms(mol):
     atoms = [atom_dict[a] for a in atoms]
     return np.array(atoms)
 
-
-# %%
 def create_ijbonddict(mol):
     '''Create a dictionary, which each key is a node ID
     and each value is the tuples of its neighboring node
@@ -33,8 +26,6 @@ def create_ijbonddict(mol):
         i_jbond_dict[j].append((i, bond))
     return i_jbond_dict
 
-
-# %%
 def extract_fingerprints(atoms, i_jbond_dict, radius):
     '''Extract the r-radius subgraphs (i.e., fingerprints)
     from a molecular graph using Weisfeiler-Lehman algorithm.'''
@@ -69,20 +60,14 @@ def extract_fingerprints(atoms, i_jbond_dict, radius):
 
     return np.array(fingerprints)
 
-
-# %%
 def create_adjacency(mol):
     adjacency = Chem.GetAdjacencyMatrix(mol)
     return np.array(adjacency)
 
-
-# %%
 def dump_dictionary(dictionary, filename):
     with open(filename, 'wb') as f:
         pickle.dump(dict(dictionary), f)
 
-
-# %%
 def main():
     DATASET = 'HIV'
     # DATASET = yourdata
@@ -100,7 +85,7 @@ def main():
     
     Smiles, molecules, adjacencies, properties = '', [], [], []
 
-    for data in tqdm(data_list):
+    for index, data in enumerate(data_list, 1):
         smiles, property = data.strip().split()
         Smiles += smiles + '\n'
 
@@ -115,6 +100,9 @@ def main():
         adjacencies.append(adjacency)
 
         properties.append(np.array([float(property)]))
+        
+        print('\r%5d/%5d' % (index, len(data_list)), end='')
+    print('')
 
     dir_input = '../../dataset/classification/%s/input/radius%d/' % (DATASET, radius)
     os.makedirs(dir_input, exist_ok=True)
@@ -128,8 +116,6 @@ def main():
 
     print('The preprocess of %s dataset has finished!' % DATASET)
 
-
-# %%
 if __name__ == '__main__':
     atom_dict = defaultdict(lambda: len(atom_dict))
     bond_dict = defaultdict(lambda: len(bond_dict))
@@ -137,5 +123,3 @@ if __name__ == '__main__':
     edge_dict = defaultdict(lambda: len(edge_dict))
 
     main()
-
-# %%

@@ -1,4 +1,3 @@
-# %%
 import numpy as np
 import pickle
 from sklearn.metrics import roc_auc_score, precision_score, recall_score
@@ -6,14 +5,11 @@ from sklearn.model_selection import train_test_split
 import timeit
 import sys
 
-# %%
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-
-# %%
 class GraphNeuralNetwork(nn.Module):
     def __init__(self, dim, n_fingerprint, hidden_layer, output_layer, update_func, output_func):
         super(GraphNeuralNetwork, self).__init__()
@@ -81,8 +77,6 @@ class GraphNeuralNetwork(nn.Module):
 
         return Smiles, molecular_properties
 
-
-# %%
 def train(dataset, model, optimizer, batch, device):
     model.train()
     loss_total = 0
@@ -98,8 +92,6 @@ def train(dataset, model, optimizer, batch, device):
         loss_total += loss.to('cpu').data.numpy()
     return loss_total
 
-
-# %%
 def test(dataset, model, batch, device):
     model.eval()
     SMILES, Ts, Ys, Ss = '', [], [], []
@@ -134,13 +126,9 @@ def test(dataset, model, batch, device):
 
     return AUC, precision, recall, predictions
 
-
-# %%
 def load_tensor(filename, dtype, device):
     return [dtype(d).to(device) for d in np.load(filename + '.npy', allow_pickle=True)]
 
-
-# %%
 def main():
     '''Hyperparameters.'''
     DATASET = 'HIV'
@@ -230,11 +218,7 @@ def main():
         out.write(predictions_test + '\n')
     torch.save(model.state_dict(), file_model)
 
-
-# %%
 if __name__ == '__main__':
     np.random.seed(123)
     torch.manual_seed(123)
     main()
-
-# %%

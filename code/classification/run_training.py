@@ -118,7 +118,7 @@ def test(dataset, model, batch, device):
     S = np.concatenate(Ss)
 
     AUC = roc_auc_score(T, S)
-    precision = precision_score(T, Y)
+    precision = 0. if np.sum(Y) == 0 else precision_score(T, Y)
     recall = recall_score(T, Y)
 
     T, Y, S = map(str, T), map(str, Y), map(str, S)
@@ -178,9 +178,11 @@ def main():
 
     # Create a dataset and split it into train/test.
     dataset = list(zip(Smiles, molecules, adjacencies, properties))
+
     np.random.shuffle(dataset)
-    dataset_train, dataset_test = train_test_split(dataset, train_size=0.8, test_size=0.2)
-    print(len(dataset), len(dataset_train), len(dataset_test))
+
+    dataset_train, dataset_test = train_test_split(dataset, train_size=0.8, test_size=0.2, stratify=properties)
+    print('dataset: %d, training: %d, validation: %d' % (len(dataset), len(dataset_train), len(dataset_test)))
 
     # Set a model.
     model = GraphNeuralNetwork(dim, n_fingerprint, hidden_layer, output_layer, update_func, output_func)
@@ -189,15 +191,13 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     
     # Output files.
-    file_AUCs = '../../output/result/AUCs--%s.txt' % setting
     file_predictions = '../../output/result/predictions--%s.txt' % setting
     file_model = '../../output/model/%s.pth' % setting
-    columns = ['Epoch', 'Time(sec)', 'Loss_train', 'AUC_test', 'Precision_test', 'Recall_test']
-    AUCs = '\t'.join(columns)
+    columns = ['Epoch', 'Time(sec)', 'Loss_train', 'AUC_val', 'Prec_val', 'Recall_val']
 
     # Start training.
     print('Training...')
-    print(AUCs)
+    print(''.join(map(lambda x: '%12s' % x, columns)))
     start = timeit.default_timer()
 
     for epoch in range(1, iteration):
@@ -208,14 +208,15 @@ def main():
         AUC_test, precision_test, recall_test, predictions_test = test(dataset_test, model, batch, device)
 
         time = timeit.default_timer() - start
+        start = start + time
 
         values = [time, loss_train, AUC_test, precision_test, recall_test]
-        AUCs = str(epoch) + '\t' + '\t'.join(map(lambda x: '%.3f' % x, values))
-        print(AUCs)
+        print('%12s' % epoch + ''.join(map(lambda x: '%12.3f' % x, values)))
 
     with open(file_predictions, 'w') as out:
         out.write('\t'.join(['Smiles', 'Correct', 'Predict', 'Score']) + '\n')
         out.write(predictions_test + '\n')
+
     torch.save(model.state_dict(), file_model)
 
 if __name__ == '__main__':

@@ -129,14 +129,10 @@ def test(dataset, model, batch, device):
 def load_tensor(filename, dtype, device):
     return [dtype(d).to(device) for d in np.load(filename + '.npy', allow_pickle=True)]
 
-def main():
+def main(radius):
     '''Hyperparameters.'''
     DATASET = 'HIV'
     #DATASET = yourdata
-
-    #radius = 1
-    radius = 2
-    #radius = 3
 
     update_func = 'sum'
     #update_func = 'mean'
@@ -155,7 +151,9 @@ def main():
     
     iteration = 30
     
-    setting = 'default'
+    setting = '%d-%s-%s-%d-%d-%d-%d-%f-%f-%d-%f' % (
+            radius, update_func, output_func, dim, hidden_layer, output_layer,
+            batch, lr, lr_decay, decay_interval, weight_decay)
 
     # CPU or GPU.
     if torch.cuda.is_available():
@@ -222,4 +220,5 @@ def main():
 if __name__ == '__main__':
     np.random.seed(123)
     torch.manual_seed(123)
-    main()
+    for radius in range(0, 4):
+        main(radius)

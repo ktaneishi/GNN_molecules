@@ -68,14 +68,9 @@ def dump_dictionary(dictionary, filename):
     with open(filename, 'wb') as f:
         pickle.dump(dict(dictionary), f)
 
-def main():
-    DATASET = 'HIV'
+def main(radius):
     # DATASET = yourdata
-
-    # radius=0  # w/o fingerprints (i.e., atoms).
-    # radius=1
-    radius=2
-    # radius=3
+    DATASET = 'HIV'
 
     with open('../../dataset/classification/%s/original/data.txt' % DATASET, 'r') as f:
         data_list = f.read().strip().split('\n')
@@ -101,7 +96,7 @@ def main():
 
         properties.append(np.array([float(property)]))
         
-        print('\r%5d/%5d' % (index, len(data_list)), end='')
+        print('\rradius: 5d, %5d/%5d' % (radius, index, len(data_list)), end='')
     print('')
 
     dir_input = '../../dataset/classification/%s/input/radius%d/' % (DATASET, radius)
@@ -114,12 +109,14 @@ def main():
     np.save(os.path.join(dir_input, 'properties'), properties)
     dump_dictionary(fingerprint_dict, os.path.join(dir_input, 'fingerprint_dict.pkl'))
 
-    print('The preprocess of %s dataset has finished!' % DATASET)
-
 if __name__ == '__main__':
     atom_dict = defaultdict(lambda: len(atom_dict))
     bond_dict = defaultdict(lambda: len(bond_dict))
     fingerprint_dict = defaultdict(lambda: len(fingerprint_dict))
     edge_dict = defaultdict(lambda: len(edge_dict))
 
-    main()
+    # radius=0...3  # w/o fingerprints (i.e., atoms).
+    for radius in range(0, 4):
+        main(radius)
+
+    print('The preprocess of %s dataset has finished!' % DATASET)

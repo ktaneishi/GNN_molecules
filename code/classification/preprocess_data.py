@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import numpy as np
 from collections import defaultdict
 import pickle
@@ -96,7 +97,7 @@ def main(radius):
 
         properties.append(np.array([float(property)]))
         
-        print('\rradius: 5d, %5d/%5d' % (radius, index, len(data_list)), end='')
+        print('\rradius: %5d, %5d/%5d' % (radius, index, len(data_list)), end='')
     print('')
 
     dir_input = '../../dataset/classification/%s/input/radius%d/' % (DATASET, radius)

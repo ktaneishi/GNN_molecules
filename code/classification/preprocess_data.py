@@ -120,4 +120,4 @@ if __name__ == '__main__':
     for radius in range(0, 4):
         main(radius)
 
-    print('The preprocess of %s dataset has finished!' % DATASET)
+    print('The preprocess of dataset has finished!')

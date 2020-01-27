@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import numpy as np
 import pickle
 from sklearn.metrics import roc_auc_score, precision_score, recall_score
@@ -154,6 +155,8 @@ def main(radius):
     setting = '%d-%s-%s-%d-%d-%d-%d-%f-%f-%d-%f' % (
             radius, update_func, output_func, dim, hidden_layer, output_layer,
             batch, lr, lr_decay, decay_interval, weight_decay)
+
+    print('radius: %d' % radius)
 
     # CPU or GPU.
     if torch.cuda.is_available():

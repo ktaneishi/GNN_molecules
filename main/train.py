@@ -1,45 +1,37 @@
-# %%
-import sys
-import timeit
-
-# %%
+#!/usr/bin/env python
 import numpy as np
-
-# %%
-import torch
+from sklearn.metrics import roc_auc_score
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
-# %%
-from sklearn.metrics import roc_auc_score
-
-# %%
+import torch
 import preprocess as pp
+import timeit
+import sys
 
-
-# %%
 class MolecularGraphNeuralNetwork(nn.Module):
-    def __init__(self, N_fingerprints, dim, layer_hidden, layer_output):
+    def __init__(self, N_fingerprints, dim, layer_hidden, layer_output, task, device):
         super(MolecularGraphNeuralNetwork, self).__init__()
         self.embed_fingerprint = nn.Embedding(N_fingerprints, dim)
         self.W_fingerprint = nn.ModuleList([nn.Linear(dim, dim)
                                             for _ in range(layer_hidden)])
         self.W_output = nn.ModuleList([nn.Linear(dim, dim)
                                        for _ in range(layer_output)])
-        if task == 'classification':
+        self.task = task
+        if self.task == 'classification':
             self.W_property = nn.Linear(dim, 2)
-        if task == 'regression':
+        if self.task == 'regression':
             self.W_property = nn.Linear(dim, 1)
+        self.device = device
 
     def pad(self, matrices, pad_value):
-        """Pad the list of matrices with a pad_value (e.g., 0) for batch processing.
+        '''Pad the list of matrices with a pad_value (e.g., 0) for batch processing.
         For example, given a list of matrices [A, B, C], we obtain a new matrix [A00, 0B0, 00C],
         where 0 is the zero (i.e., pad value) matrix.
-        """
+        '''
         shapes = [m.shape for m in matrices]
         M, N = sum([s[0] for s in shapes]), sum([s[1] for s in shapes])
-        zeros = torch.FloatTensor(np.zeros((M, N))).to(device)
+        zeros = torch.FloatTensor(np.zeros((M, N))).to(self.device)
         pad_matrices = pad_value + zeros
         i, j = 0, 0
         for k, matrix in enumerate(matrices):
@@ -63,26 +55,26 @@ class MolecularGraphNeuralNetwork(nn.Module):
 
     def gnn(self, inputs):
 
-        """Cat or pad each input data for batch processing."""
+        '''Cat or pad each input data for batch processing.'''
         fingerprints, adjacencies, molecular_sizes = inputs
         fingerprints = torch.cat(fingerprints)
         adjacencies = self.pad(adjacencies, 0)
 
-        """GNN layer (update the fingerprint vectors)."""
+        '''GNN layer (update the fingerprint vectors).'''
         fingerprint_vectors = self.embed_fingerprint(fingerprints)
-        for l in range(layer_hidden):
+        for l in range(len(self.W_fingerprint)):
             hs = self.update(adjacencies, fingerprint_vectors, l)
             fingerprint_vectors = F.normalize(hs, 2, 1)  # normalize.
 
-        """Molecular vector by sum or mean of the fingerprint vectors."""
+        '''Molecular vector by sum or mean of the fingerprint vectors.'''
         molecular_vectors = self.sum(fingerprint_vectors, molecular_sizes)
         # molecular_vectors = self.mean(fingerprint_vectors, molecular_sizes)
 
         return molecular_vectors
 
     def mlp(self, vectors):
-        """Classifier or regressor based on multilayer perceptron."""
-        for l in range(layer_output):
+        '''Classifier or regressor based on multilayer perceptron.'''
+        for l in range(len(self.W_output)):
             vectors = torch.relu(self.W_output[l](vectors))
         outputs = self.W_property(vectors)
         return outputs
@@ -124,22 +116,20 @@ class MolecularGraphNeuralNetwork(nn.Module):
             correct_values = np.concatenate(correct_values)
             return predicted_values, correct_values
 
-
-# %%
 class Trainer(object):
-    def __init__(self, model):
+    def __init__(self, model, lr):
         self.model = model
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
 
-    def train(self, dataset):
+    def train(self, dataset, batch_train):
         np.random.shuffle(dataset)
         N = len(dataset)
         loss_total = 0
         for i in range(0, N, batch_train):
             data_batch = list(zip(*dataset[i:i+batch_train]))
-            if task == 'classification':
+            if self.model.task == 'classification':
                 loss = self.model.forward_classifier(data_batch, train=True)
-            if task == 'regression':
+            if self.model.task == 'regression':
                 loss = self.model.forward_regressor(data_batch, train=True)
             self.optimizer.zero_grad()
             loss.backward()
@@ -147,13 +137,11 @@ class Trainer(object):
             loss_total += loss.item()
         return loss_total
 
-
-# %%
 class Tester(object):
     def __init__(self, model):
         self.model = model
 
-    def test_classifier(self, dataset):
+    def test_classifier(self, dataset, batch_test):
         N = len(dataset)
         P, C = [], []
         for i in range(0, N, batch_test):
@@ -165,7 +153,7 @@ class Tester(object):
         AUC = roc_auc_score(np.concatenate(C), np.concatenate(P))
         return AUC
 
-    def test_regressor(self, dataset):
+    def test_regressor(self, dataset, batch_test):
         N = len(dataset)
         SAE = 0  # sum absolute error.
         for i in range(0, N, batch_test):
@@ -180,8 +168,6 @@ class Tester(object):
         with open(filename, 'a') as f:
             f.write(result + '\n')
 
-
-# %%
 def main():
     #task=classification  # target is a binary value (e.g., drug or not).
     #dataset=hiv
@@ -201,7 +187,9 @@ def main():
     decay_interval = 10
     iteration = 1000
 
-    setting = 'default'
+    setting = '%s-%d-%d-%d-%d-%d-%d-%f-%f-%d-%d' % (
+            dataset, radius, dim, layer_hidden, layer_output, batch_train, batch_test,
+            lr, lr_decay, decay_interval, iteration)
     
     if torch.cuda.is_available():
         device = torch.device('cuda')
@@ -223,17 +211,17 @@ def main():
     print('-' * 100)
 
     print('Creating a model.')
-    model = MolecularGraphNeuralNetwork(N_fingerprints, dim, layer_hidden, layer_output).to(device)
-    trainer = Trainer(model)
+    model = MolecularGraphNeuralNetwork(N_fingerprints, dim, layer_hidden, layer_output, task, device).to(device)
+    trainer = Trainer(model, lr)
     tester = Tester(model)
     print('# of model parameters:', sum([np.prod(p.size()) for p in model.parameters()]))
     print('-' * 100)
 
     file_result = '../output/result--' + setting + '.txt'
     if task == 'classification':
-        result = 'Epoch\tTime(sec)\tLoss_train\tAUC_dev\tAUC_test'
+        result = '%5s%12s%12s%12s%12s' % ('Epoch', 'Time(sec)', 'Loss_train', 'AUC_dev', 'AUC_test')
     if task == 'regression':
-        result = 'Epoch\tTime(sec)\tLoss_train\tMAE_dev\tMAE_test'
+        result = '%5s%12s%12s%12s%12s' % ('Epoch', 'Time(sec)', 'Loss_train', 'MAE_dev', 'MAE_test')
 
     with open(file_result, 'w') as f:
         f.write(result + '\n')
@@ -248,16 +236,17 @@ def main():
         if epoch % decay_interval == 0:
             trainer.optimizer.param_groups[0]['lr'] *= lr_decay
 
-        loss_train = trainer.train(dataset_train)
+        loss_train = trainer.train(dataset_train, batch_train)
 
         if task == 'classification':
-            prediction_dev = tester.test_classifier(dataset_dev)
-            prediction_test = tester.test_classifier(dataset_test)
+            prediction_dev = tester.test_classifier(dataset_dev, batch_test)
+            prediction_test = tester.test_classifier(dataset_test, batch_test)
         if task == 'regression':
-            prediction_dev = tester.test_regressor(dataset_dev)
-            prediction_test = tester.test_regressor(dataset_test)
+            prediction_dev = tester.test_regressor(dataset_dev, batch_test)
+            prediction_test = tester.test_regressor(dataset_test, batch_test)
 
         time = timeit.default_timer() - start
+        start = start + time
 
         if epoch == 1:
             minutes = time * iteration / 60
@@ -267,16 +256,13 @@ def main():
             print('-' * 100)
             print(result)
 
-        result = '\t'.join(map(str, [epoch, time, loss_train, prediction_dev, prediction_test]))
+        result = '%5d%12.4f%12.4f%12.4f%12.4f' % (epoch, time, loss_train, prediction_dev, prediction_test)
         tester.save_result(result, file_result)
 
         print(result)
 
-
-# %%
-if __name__ == "__main__":
-    np.random.seed(123)
-    torch.manual_seed(123)
+if __name__ == '__main__':
+    seed = 123
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     main()
-
-# %%

@@ -1,6 +1,5 @@
 import numpy as np
 from collections import defaultdict
-from rdkit import Chem
 import torch
 
 def create_atoms(mol, atom_dict):
@@ -87,11 +86,12 @@ def create_datasets(task, dataset, radius):
     edge_dict = defaultdict(lambda: len(edge_dict))
 
     def create_dataset(filename):
+        from rdkit import Chem
 
         '''Load a dataset.'''
         with open(dir_dataset + filename, 'r') as f:
-            smiles_property = f.readline().strip().split()[:1000]
-            data_original = f.read().strip().split('\n')[:1000]
+            smiles_property = f.readline().strip().split()
+            data_original = f.read().strip().split('\n')
 
         '''Exclude the data contains '.' in its smiles.'''
         data_original = [data for data in data_original if '.' not in data.split()[0]]

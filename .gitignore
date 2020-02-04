@@ -12,6 +12,7 @@ docs/_build/
 
 # data
 *.npy
+*.npz
 *.pickle
 Smiles.txt
 

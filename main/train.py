@@ -14,10 +14,8 @@ class MolecularGraphNeuralNetwork(nn.Module):
     def __init__(self, N_fingerprints, dim, layer_hidden, layer_output, task):
         super(MolecularGraphNeuralNetwork, self).__init__()
         self.embed_fingerprint = nn.Embedding(N_fingerprints, dim)
-        self.W_fingerprint = nn.ModuleList([nn.Linear(dim, dim)
-                                            for _ in range(layer_hidden)])
-        self.W_output = nn.ModuleList([nn.Linear(dim, dim)
-                                       for _ in range(layer_output)])
+        self.W_fingerprint = nn.ModuleList([nn.Linear(dim, dim)] * layer_hidden)
+        self.W_output = nn.ModuleList([nn.Linear(dim, dim)] * layer_output)
         self.task = task
         if self.task == 'classification':
             self.W_property = nn.Linear(dim, 2)
@@ -150,8 +148,7 @@ class Tester(object):
         P, C = [], []
         for i in range(0, N, batch_test):
             data_batch = list(zip(*dataset[i:i+batch_test]))
-            predicted_scores, correct_labels = self.model.forward_classifier(
-                                               data_batch, train=False)
+            predicted_scores, correct_labels = self.model.forward_classifier(data_batch, train=False)
             P.append(predicted_scores)
             C.append(correct_labels)
         AUC = roc_auc_score(np.concatenate(C), np.concatenate(P))
@@ -162,8 +159,7 @@ class Tester(object):
         SAE = 0  # sum absolute error.
         for i in range(0, N, batch_test):
             data_batch = list(zip(*dataset[i:i+batch_test]))
-            predicted_values, correct_values = self.model.forward_regressor(
-                                               data_batch, train=False)
+            predicted_values, correct_values = self.model.forward_regressor(data_batch, train=False)
             SAE += sum(np.abs(predicted_values-correct_values))
         MAE = SAE / N  # mean absolute error.
         return MAE

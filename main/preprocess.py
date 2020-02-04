@@ -74,7 +74,7 @@ def split_dataset(dataset, ratio):
     n = int(ratio * len(dataset))
     return dataset[:n], dataset[n:]
 
-def create_datasets(task, dataset, radius, device):
+def create_datasets(task, dataset, radius):
 
     dir_dataset = '../dataset/' + task + '/' + dataset + '/'
 
@@ -90,12 +90,11 @@ def create_datasets(task, dataset, radius, device):
 
         '''Load a dataset.'''
         with open(dir_dataset + filename, 'r') as f:
-            smiles_property = f.readline().strip().split()
-            data_original = f.read().strip().split('\n')
+            smiles_property = f.readline().strip().split()[:1000]
+            data_original = f.read().strip().split('\n')[:1000]
 
         '''Exclude the data contains '.' in its smiles.'''
-        data_original = [data for data in data_original
-                         if '.' not in data.split()[0]]
+        data_original = [data for data in data_original if '.' not in data.split()[0]]
 
         dataset = []
 
@@ -108,19 +107,8 @@ def create_datasets(task, dataset, radius, device):
             atoms = create_atoms(mol, atom_dict)
             molecular_size = len(atoms)
             i_jbond_dict = create_ijbonddict(mol, bond_dict)
-            fingerprints = extract_fingerprints(radius, atoms, i_jbond_dict,
-                                                fingerprint_dict, edge_dict)
+            fingerprints = extract_fingerprints(radius, atoms, i_jbond_dict, fingerprint_dict, edge_dict)
             adjacency = Chem.GetAdjacencyMatrix(mol)
-
-            '''Transform the above each data of numpy
-            to pytorch tensor on a device (i.e., CPU or GPU).
-            '''
-            fingerprints = torch.LongTensor(fingerprints).to(device)
-            adjacency = torch.FloatTensor(adjacency).to(device)
-            if task == 'classification':
-                property = torch.LongTensor([int(property)]).to(device)
-            if task == 'regression':
-                property = torch.FloatTensor([[float(property)]]).to(device)
 
             dataset.append((fingerprints, adjacency, molecular_size, property))
 
@@ -129,9 +117,10 @@ def create_datasets(task, dataset, radius, device):
         return dataset
 
     dataset_train = create_dataset('data_train.txt')
-    dataset_train, dataset_dev = split_dataset(dataset_train, 0.9)
-    dataset_test = create_dataset('data_test.txt')
+    dataset_train, dataset_test = split_dataset(dataset_train, 0.8)
 
     N_fingerprints = len(fingerprint_dict)
 
-    return dataset_train, dataset_dev, dataset_test, N_fingerprints
+    np.savez('dataset.npz', dataset_train=dataset_train, dataset_test=dataset_test, N_fingerprints=N_fingerprints)
+
+    return dataset_train, dataset_test, N_fingerprints

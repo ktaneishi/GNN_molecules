@@ -84,11 +84,13 @@ class MolecularGraphNeuralNetwork(nn.Module):
         correct_labels = torch.cat(data_batch[-1])
 
         if train:
+            self.train()
             molecular_vectors = self.gnn(inputs)
             predicted_scores = self.mlp(molecular_vectors)
             loss = F.cross_entropy(predicted_scores, correct_labels)
             return loss
         else:
+            self.eval()
             with torch.no_grad():
                 molecular_vectors = self.gnn(inputs)
                 predicted_scores = self.mlp(molecular_vectors)
@@ -102,11 +104,13 @@ class MolecularGraphNeuralNetwork(nn.Module):
         correct_values = torch.cat(data_batch[-1])
 
         if train:
+            self.train()
             molecular_vectors = self.gnn(inputs)
             predicted_values = self.mlp(molecular_vectors)
             loss = F.mse_loss(predicted_values, correct_values)
             return loss
         else:
+            self.eval()
             with torch.no_grad():
                 molecular_vectors = self.gnn(inputs)
                 predicted_values = self.mlp(molecular_vectors)
@@ -203,9 +207,10 @@ def main():
     print('Preprocessing the', dataset, 'dataset.')
     print('Just a moment......')
     if os.path.exists(filename):
-        dataset_train, dataset_test, N_fingerprints = np.load(fiename, allow_pickle=True).values()
+        dataset_train, dataset_test, N_fingerprints = np.load(filename, allow_pickle=True).values()
     else:
         (dataset_train, dataset_test, N_fingerprints) = pp.create_datasets(task, dataset, radius)
+        np.savez(filename, dataset_train=dataset_train, dataset_test=dataset_test, N_fingerprints=N_fingerprints)
 
     for dataset in [dataset_train, dataset_test]:
         for index, (fingerprints, adjacency, molecular_size, property) in enumerate(dataset):

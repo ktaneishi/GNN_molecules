@@ -121,6 +121,4 @@ def create_datasets(task, dataset, radius):
 
     N_fingerprints = len(fingerprint_dict)
 
-    np.savez('dataset.npz', dataset_train=dataset_train, dataset_test=dataset_test, N_fingerprints=N_fingerprints)
-
     return dataset_train, dataset_test, N_fingerprints

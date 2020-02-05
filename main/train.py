@@ -206,7 +206,7 @@ def main():
         dataset_train, dataset_test, N_fingerprints = np.load(filename, allow_pickle=True).values()
     else:
         (dataset_train, dataset_test, N_fingerprints) = pp.create_datasets(task, dataset, radius)
-        np.savez(filename, dataset_train=dataset_train, dataset_test=dataset_test, N_fingerprints=N_fingerprints)
+        np.savez_compressed(filename, dataset_train=dataset_train, dataset_test=dataset_test, N_fingerprints=N_fingerprints)
 
     for dataset in [dataset_train, dataset_test]:
         for index, (fingerprints, adjacency, molecular_size, property) in enumerate(dataset):

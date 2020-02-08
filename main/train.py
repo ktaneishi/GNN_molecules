@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import numpy as np
-from sklearn.metrics import roc_auc_score
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -92,9 +91,9 @@ class MolecularGraphNeuralNetwork(nn.Module):
             with torch.no_grad():
                 molecular_vectors = self.gnn(inputs)
                 predicted_scores = self.mlp(molecular_vectors)
-            predicted_scores = predicted_scores.to('cpu').data.numpy()
+            predicted_scores = predicted_scores.to('cpu').detach().numpy()
             predicted_scores = [s[1] for s in predicted_scores]
-            correct_labels = correct_labels.to('cpu').data.numpy()
+            correct_labels = correct_labels.to('cpu').detach().numpy()
             return predicted_scores, correct_labels
 
     def forward_regressor(self, data_batch, train):
@@ -112,8 +111,8 @@ class MolecularGraphNeuralNetwork(nn.Module):
             with torch.no_grad():
                 molecular_vectors = self.gnn(inputs)
                 predicted_values = self.mlp(molecular_vectors)
-            predicted_values = predicted_values.to('cpu').data.numpy()
-            correct_values = correct_values.to('cpu').data.numpy()
+            predicted_values = predicted_values.to('cpu').detach().numpy()
+            correct_values = correct_values.to('cpu').detach().numpy()
             predicted_values = np.concatenate(predicted_values)
             correct_values = np.concatenate(correct_values)
             return predicted_values, correct_values
@@ -145,14 +144,15 @@ class Tester(object):
 
     def test_classifier(self, dataset, batch_test):
         N = len(dataset)
-        P, C = [], []
+        y_score, y_true = [], []
+        loss_total = 0
         for i in range(0, N, batch_test):
             data_batch = list(zip(*dataset[i:i+batch_test]))
             predicted_scores, correct_labels = self.model.forward_classifier(data_batch, train=False)
-            P.append(predicted_scores)
-            C.append(correct_labels)
-        AUC = roc_auc_score(np.concatenate(C), np.concatenate(P))
-        return AUC
+            y_score.append(predicted_scores)
+            y_true.append(correct_labels)
+        acc = np.equal(np.concatenate(y_score) > 0.5, np.concatenate(y_true)).sum()
+        return acc
 
     def test_regressor(self, dataset, batch_test):
         N = len(dataset)
@@ -231,7 +231,7 @@ def main():
 
     file_result = '../output/result--' + setting + '.txt'
     if task == 'classification':
-        result = '%5s%12s%12s%12s' % ('epoch', 'train_loss', 'test_AUC', 'time(sec)')
+        result = '%5s%12s%12s%12s' % ('epoch', 'train_loss', 'test_acc', 'time(sec)')
     if task == 'regression':
         result = '%5s%12s%12s%12s' % ('epoch', 'train_loss', 'test_MAE', 'time(sec)')
 
@@ -250,7 +250,8 @@ def main():
         loss_train = trainer.train(dataset_train, batch_train)
 
         if task == 'classification':
-            prediction_test = tester.test_classifier(dataset_test, batch_test)
+            #prediction_test = tester.test_classifier(dataset_test, batch_test)
+            test_acc = tester.test_classifier(dataset_test, batch_test)
         if task == 'regression':
             prediction_test = tester.test_regressor(dataset_test, batch_test)
 
@@ -264,7 +265,7 @@ def main():
             print('The training will finish in about', hours, 'hours', minutes, 'minutes.')
             print(result)
 
-        result = '%5d%12.4f%12.4f%12.4f' % (epoch, loss_train, prediction_test, time)
+        result = '%5d%12.4f%12.4f%12.4f' % (epoch, loss_train, test_acc, time)
         tester.save_result(result, file_result)
 
         print(result)

@@ -1,6 +1,5 @@
 import numpy as np
 from collections import defaultdict
-import torch
 
 def create_atoms(mol, atom_dict):
     '''Transform the atom types in a molecule (e.g., H, C, and O)

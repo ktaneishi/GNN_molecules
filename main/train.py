@@ -185,7 +185,7 @@ def main():
     lr = 1e-4
     lr_decay = 0.99
     decay_interval = 10
-    iteration = 10 #1000
+    iteration = 1000
 
     seed = 123
     np.random.seed(seed)

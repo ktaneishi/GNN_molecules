@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
@@ -91,9 +90,9 @@ class MolecularGraphNeuralNetwork(nn.Module):
             with torch.no_grad():
                 molecular_vectors = self.gnn(inputs)
                 predicted_scores = self.mlp(molecular_vectors)
-            predicted_scores = predicted_scores.to('cpu').detach().numpy()
+            predicted_scores = predicted_scores.cpu()
             predicted_scores = [s[1] for s in predicted_scores]
-            correct_labels = correct_labels.to('cpu').detach().numpy()
+            correct_labels = correct_labels.cpu()
             return predicted_scores, correct_labels
 
     def forward_regressor(self, data_batch, train):
@@ -111,8 +110,8 @@ class MolecularGraphNeuralNetwork(nn.Module):
             with torch.no_grad():
                 molecular_vectors = self.gnn(inputs)
                 predicted_values = self.mlp(molecular_vectors)
-            predicted_values = predicted_values.to('cpu').detach().numpy()
-            correct_values = correct_values.to('cpu').detach().numpy()
+            predicted_values = predicted_values.cpu()
+            correct_values = correct_values.cpu()
             predicted_values = np.concatenate(predicted_values)
             correct_values = np.concatenate(correct_values)
             return predicted_values, correct_values

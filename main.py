@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch
+from sklearn.metrics import precision_score, recall_score
 import argparse
 import timeit
 
@@ -25,38 +26,28 @@ def train(dataset, model, optimizer, loss_function, batch_train, epoch):
         
         print('\repoch %4d batch %4d train_loss %5.3f' % (epoch, batch_index, train_loss / batch_index), end='')
 
-def test_classifier(dataset, model, batch_test):
+def test(dataset, model, loss_function, batch_test):
     y_score, y_true = [], []
+    test_loss = 0
     model.eval()
 
-    for index in range(0, len(dataset), batch_test):
+    for batch_index, index in enumerate(range(0, len(dataset), batch_test), 1):
         data_batch = list(zip(*dataset[index:index+batch_test]))
         correct = torch.cat(data_batch[-1])
         with torch.no_grad():
             predicted = model.forward(data_batch)
-        predicted = [s[1] for s in predicted.cpu()]
-        y_score.append(predicted)
+        loss = loss_function(predicted, correct)
+        test_loss += loss.item()
+
+        y_score.append(predicted.cpu())
         y_true.append(correct.cpu())
 
-    acc = np.equal(np.concatenate(y_score) > 0.5, np.concatenate(y_true)).sum() / len(dataset)
+    print(' test_loss %5.3f' % (test_loss / batch_index), end='')
 
-    print(' test_acc %5.3f' % (acc), end='')
+    y_score = np.concatenate(y_score)
+    y_true = np.concatenate(y_true)
 
-def test_regressor(dataset, model, batch_test):
-    SAE = 0 # sum absolute error.
-    model.eval()
-
-    for index in range(0, len(dataset), batch_test):
-        data_batch = list(zip(*dataset[index:index+batch_test]))
-        correct = torch.cat(data_batch[-1])
-        with torch.no_grad():
-            predicted = model.forward(data_batch)
-        predicted = np.concatenate(predicted.cpu())
-        correct = np.concatenate(correct.cpu())
-        SAE += sum(np.abs(predicted - correct))
-
-    MAE = SAE / len(dataset)  # mean absolute error.
-    print(' test_MAE %6.3f' % (MAE), end='')
+    return y_score, y_true
 
 def main():
     parser = argparse.ArgumentParser()
@@ -64,7 +55,6 @@ def main():
     # regression target is a real value (e.g., energy eV).
     parser.add_argument('--task', default='classification', choices=['classification', 'regression'])
     parser.add_argument('--dataset', default='hiv', choices=['hiv', 'photovoltaic'])
-    parser.add_argument('--radius', default=1)
     parser.add_argument('--dim', default=50)
     parser.add_argument('--layer_hidden', default=6)
     parser.add_argument('--layer_output', default=6)
@@ -107,9 +97,9 @@ def main():
     print('# of test data samples:', len(dataset_test))
 
     print('Creating a model.')
-    outcome = 1 if args.task == 'regression' else 2
+    n_output = 1 if args.task == 'regression' else 2
     model = MolecularGraphNeuralNetwork(N_fingerprints, 
-            dim=args.dim, layer_hidden=args.layer_hidden, layer_output=args.layer_output, outcome=outcome).to(device)
+            dim=args.dim, layer_hidden=args.layer_hidden, layer_output=args.layer_output, n_output=n_output).to(device)
     print('# of model parameters:', sum([np.prod(p.size()) for p in model.parameters()]))
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -125,12 +115,19 @@ def main():
             optimizer.param_groups[0]['lr'] *= args.lr_decay
 
         train(dataset_train, model, optimizer, loss_function, args.batch_train, epoch)
+        y_score, y_true = test(dataset_test, model, loss_function, args.batch_test)
 
         if args.task == 'classification':
-            test_classifier(dataset_test, model, args.batch_test)
+            y_pred = [np.argmax(x) for x in y_score]
+            if len(np.unique(y_pred)) == 2:
+                prec = precision_score(y_true, y_pred)
+                recall = recall_score(y_true, y_pred)
+                print(' test_prec %5.3f test_recall %5.3f' % (prec, recall), end='')
 
         if args.task == 'regression':
-            test_regressor(dataset_test, model, args.batch_test)
+            MAE = np.mean(np.abs(y_score - y_true))
+            # mean absolute error
+            print(' test_MAE %5.3f' % (MAE), end='')
 
         print(' %5.1f sec' % (timeit.default_timer() - epoch_start))
 

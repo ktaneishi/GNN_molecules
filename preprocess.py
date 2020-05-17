@@ -62,53 +62,42 @@ def extract_fingerprints(radius, atoms, i_jbond_dict, fingerprint_dict, edge_dic
 
     return np.array(nodes)
 
-def create_datasets(task, dataset, radius):
-    dir_dataset = 'dataset/%s/%s/' % (task, dataset)
+def create_dataset(filename, args):
+    from rdkit import Chem
 
-    '''Initialize x_dict, in which each key is a symbol type
-    (e.g., atom and chemical bond) and each value is its index.
-    '''
-    atom_dict = defaultdict(lambda: len(atom_dict))
-    bond_dict = defaultdict(lambda: len(bond_dict))
-    fingerprint_dict = defaultdict(lambda: len(fingerprint_dict))
-    edge_dict = defaultdict(lambda: len(edge_dict))
+    dataset = []
 
-    def create_dataset(filename):
-        from rdkit import Chem
+    # Load a dataset.
+    with open('dataset/%s/%s/%s' % (args.task, args.dataset, filename), 'r') as f:
+        lines = f.readlines()
 
-        '''Load a dataset.'''
-        with open(dir_dataset + filename, 'r') as f:
-            data_original = f.read().strip().split('\n')
+        for index, line in enumerate(lines, 1):
+            smiles, property = line.strip('\n').split(' ')
 
-        '''Exclude the data contains '.' in its smiles.'''
-        data_original = [data for data in data_original if '.' not in data.split()[0]]
+            # Exclude the data contains '.' in its smiles.
+            if '.' in smiles:
+                continue
 
-        dataset = []
-
-        for index, data in enumerate(data_original, 1):
-            smiles, property = data.strip().split()
-
-            '''Create each data with the above defined functions.'''
+            # Create each data with the above defined functions.
             mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
             atoms = create_atoms(mol, atom_dict)
             molecular_size = len(atoms)
             i_jbond_dict = create_ijbonddict(mol, bond_dict)
-            fingerprints = extract_fingerprints(radius, atoms, i_jbond_dict, fingerprint_dict, edge_dict)
+            fingerprints = extract_fingerprints(args.radius, atoms, i_jbond_dict, fingerprint_dict, edge_dict)
             adjacency = Chem.GetAdjacencyMatrix(mol)
 
             dataset.append((fingerprints, adjacency, molecular_size, property))
 
-            print('\r%s: %5d/%5d' % (filename, index, len(data_original)), end='')
+            print('\r%s: %5d/%5d' % (filename, index, len(lines)), end='')
 
-        print(' finished')
-        return dataset
+    return dataset
 
-    dataset_train = create_dataset('data_train.txt')
-    dataset_test = create_dataset('data_test.txt')
-
-    N_fingerprints = len(fingerprint_dict)
-
-    return dataset_train, dataset_test, N_fingerprints
+'''Initialize x_dict, in which each key is a symbol type
+(e.g., atom and chemical bond) and each value is its index.'''
+atom_dict = defaultdict(lambda: len(atom_dict))
+bond_dict = defaultdict(lambda: len(bond_dict))
+fingerprint_dict = defaultdict(lambda: len(fingerprint_dict))
+edge_dict = defaultdict(lambda: len(edge_dict))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -119,12 +108,21 @@ if __name__ == '__main__':
     parser.add_argument('--radius', default=1)
     args = parser.parse_args()
 
-    filename = 'dataset/%s-%s.npz' %(args.task, args.dataset)
+    filename = 'dataset/%s-%s.npz' % (args.task, args.dataset)
 
     print('Preprocessing the %s dataset.' % args.dataset)
-    print('Just a moment......')
 
-    (dataset_train, dataset_test, N_fingerprints) = create_datasets(args.task, args.dataset, args.radius)
+    dataset_train = create_dataset('data_train.txt', args)
+    property = [float(data[3]) for data in dataset_train]
+    if len(np.unique(property)) == 2:
+        print(' positive ratio %4.1f%%' % (sum(property) / len(dataset_train) * 100))
+
+    dataset_test = create_dataset('data_test.txt', args)
+    property = [float(data[3]) for data in dataset_test]
+    if len(np.unique(property)) == 2:
+        print(' positive ratio %4.1f%%' % (sum(property) / len(dataset_test) * 100))
+
+    N_fingerprints = len(fingerprint_dict)
 
     np.savez_compressed(filename, 
             dataset_train=dataset_train, 

@@ -4,12 +4,12 @@ import torch.nn.functional as F
 import torch
 
 class MolecularGraphNeuralNetwork(nn.Module):
-    def __init__(self, N_fingerprints, dim, layer_hidden, layer_output, outcome):
+    def __init__(self, N_fingerprints, dim, layer_hidden, layer_output, n_output):
         super(MolecularGraphNeuralNetwork, self).__init__()
         self.embed_fingerprint = nn.Embedding(N_fingerprints, dim)
         self.W_fingerprint = nn.ModuleList([nn.Linear(dim, dim)] * layer_hidden)
         self.W_output = nn.ModuleList([nn.Linear(dim, dim)] * layer_output)
-        self.W_property = nn.Linear(dim, outcome)
+        self.W_property = nn.Linear(dim, n_output)
 
     def pad(self, matrices, pad_value):
         '''Pad the list of matrices with a pad_value (e.g., 0) for batch processing.

@@ -4,18 +4,12 @@ import torch.nn.functional as F
 import torch
 
 class MolecularGraphNeuralNetwork(nn.Module):
-    def __init__(self, N_fingerprints, args):
+    def __init__(self, N_fingerprints, dim, layer_hidden, layer_output, outcome):
         super(MolecularGraphNeuralNetwork, self).__init__()
-        self.embed_fingerprint = nn.Embedding(N_fingerprints, args.dim)
-        self.W_fingerprint = nn.ModuleList([nn.Linear(args.dim, args.dim)] * args.layer_hidden)
-        self.W_output = nn.ModuleList([nn.Linear(args.dim, args.dim)] * args.layer_output)
-        self.task = args.task
-
-        if self.task == 'classification':
-            self.W_property = nn.Linear(args.dim, 2)
-
-        if self.task == 'regression':
-            self.W_property = nn.Linear(args.dim, 1)
+        self.embed_fingerprint = nn.Embedding(N_fingerprints, dim)
+        self.W_fingerprint = nn.ModuleList([nn.Linear(dim, dim)] * layer_hidden)
+        self.W_output = nn.ModuleList([nn.Linear(dim, dim)] * layer_output)
+        self.W_property = nn.Linear(dim, outcome)
 
     def pad(self, matrices, pad_value):
         '''Pad the list of matrices with a pad_value (e.g., 0) for batch processing.
@@ -56,7 +50,7 @@ class MolecularGraphNeuralNetwork(nn.Module):
         fingerprint_vectors = self.embed_fingerprint(fingerprints)
         for l in range(len(self.W_fingerprint)):
             hs = self.update(adjacencies, fingerprint_vectors, l)
-            fingerprint_vectors = F.normalize(hs, 2, 1)  # normalize.
+            fingerprint_vectors = F.normalize(hs, 2, 1) # normalize.
 
         '''Molecular vector by sum or mean of the fingerprint vectors.'''
         molecular_vectors = self.sum(fingerprint_vectors, molecular_sizes)
@@ -69,43 +63,10 @@ class MolecularGraphNeuralNetwork(nn.Module):
         for l in range(len(self.W_output)):
             vectors = torch.relu(self.W_output[l](vectors))
         outputs = self.W_property(vectors)
-
         return outputs
 
-    def forward_classifier(self, data_batch, train):
+    def forward(self, data_batch):
         inputs = data_batch[:-1]
-        correct_labels = torch.cat(data_batch[-1])
-
-        if train:
-            molecular_vectors = self.gnn(inputs)
-            predicted_scores = self.mlp(molecular_vectors)
-            loss = F.cross_entropy(predicted_scores, correct_labels)
-            return loss
-        else:
-            with torch.no_grad():
-                molecular_vectors = self.gnn(inputs)
-                predicted_scores = self.mlp(molecular_vectors)
-            predicted_scores = predicted_scores.cpu()
-            predicted_scores = [s[1] for s in predicted_scores]
-            correct_labels = correct_labels.cpu()
-            return predicted_scores, correct_labels
-
-    def forward_regressor(self, data_batch, train):
-        inputs = data_batch[:-1]
-        correct_values = torch.cat(data_batch[-1])
-
-        if train:
-            molecular_vectors = self.gnn(inputs)
-            predicted_values = self.mlp(molecular_vectors)
-            loss = F.mse_loss(predicted_values, correct_values)
-            return loss
-
-        else:
-            with torch.no_grad():
-                molecular_vectors = self.gnn(inputs)
-                predicted_values = self.mlp(molecular_vectors)
-            predicted_values = predicted_values.cpu()
-            correct_values = correct_values.cpu()
-            predicted_values = np.concatenate(predicted_values)
-            correct_values = np.concatenate(correct_values)
-            return predicted_values, correct_values
+        molecular_vectors = self.gnn(inputs)
+        predicted = self.mlp(molecular_vectors)
+        return predicted

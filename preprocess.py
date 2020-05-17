@@ -1,5 +1,6 @@
 import numpy as np
 from collections import defaultdict
+import argparse
 
 def create_atoms(mol, atom_dict):
     '''Transform the atom types in a molecule (e.g., H, C, and O)
@@ -26,21 +27,17 @@ def create_ijbonddict(mol, bond_dict):
         i_jbond_dict[j].append((i, bond))
     return i_jbond_dict
 
-def extract_fingerprints(radius, atoms, i_jbond_dict,
-                         fingerprint_dict, edge_dict):
+def extract_fingerprints(radius, atoms, i_jbond_dict, fingerprint_dict, edge_dict):
     '''Extract the fingerprints from a molecular graph
     based on Weisfeiler-Lehman algorithm.
     '''
-
     if (len(atoms) == 1) or (radius == 0):
         nodes = [fingerprint_dict[a] for a in atoms]
-
     else:
         nodes = atoms
         i_jedge_dict = i_jbond_dict
 
         for _ in range(radius):
-
             '''Update each node ID considering its neighboring nodes and edges.
             The updated node IDs are the fingerprint IDs.
             '''
@@ -65,16 +62,8 @@ def extract_fingerprints(radius, atoms, i_jbond_dict,
 
     return np.array(nodes)
 
-def split_dataset(dataset, ratio):
-    '''Shuffle and split a dataset.'''
-    np.random.seed(1234)  # fix the seed for shuffle.
-    np.random.shuffle(dataset)
-    n = int(ratio * len(dataset))
-    return dataset[:n], dataset[n:]
-
 def create_datasets(task, dataset, radius):
-
-    dir_dataset = 'dataset/' + task + '/' + dataset + '/'
+    dir_dataset = 'dataset/%s/%s/' % (task, dataset)
 
     '''Initialize x_dict, in which each key is a symbol type
     (e.g., atom and chemical bond) and each value is its index.
@@ -89,7 +78,6 @@ def create_datasets(task, dataset, radius):
 
         '''Load a dataset.'''
         with open(dir_dataset + filename, 'r') as f:
-            smiles_property = f.readline().strip().split()
             data_original = f.read().strip().split('\n')
 
         '''Exclude the data contains '.' in its smiles.'''
@@ -98,7 +86,6 @@ def create_datasets(task, dataset, radius):
         dataset = []
 
         for index, data in enumerate(data_original, 1):
-
             smiles, property = data.strip().split()
 
             '''Create each data with the above defined functions.'''
@@ -124,16 +111,22 @@ def create_datasets(task, dataset, radius):
     return dataset_train, dataset_test, N_fingerprints
 
 if __name__ == '__main__':
-    task = 'classification' # target is a binary value (e.g., drug or not).
-    dataset = 'hiv'
-    #task = 'regression' # target is a real value (e.g., energy eV).
-    #dataset = 'photovoltaic'
+    parser = argparse.ArgumentParser()
+    # classification target is a binary value (e.g., drug or not).
+    # regression target is a real value (e.g., energy eV).
+    parser.add_argument('--task', default='classification', choices=['classification', 'regression'])
+    parser.add_argument('--dataset', default='hiv', choices=['hiv', 'photovoltaic'])
+    parser.add_argument('--radius', default=1)
+    args = parser.parse_args()
 
-    radius = 1
+    filename = 'dataset/%s-%s.npz' %(args.task, args.dataset)
 
-    filename = 'dataset/%s-%s.npz' %(task, dataset)
-
-    print('Preprocessing the', dataset, 'dataset.')
+    print('Preprocessing the %s dataset.' % args.dataset)
     print('Just a moment......')
-    (dataset_train, dataset_test, N_fingerprints) = create_datasets(task, dataset, radius)
-    np.savez_compressed(filename, dataset_train=dataset_train, dataset_test=dataset_test, N_fingerprints=N_fingerprints)
+
+    (dataset_train, dataset_test, N_fingerprints) = create_datasets(args.task, args.dataset, args.radius)
+
+    np.savez_compressed(filename, 
+            dataset_train=dataset_train, 
+            dataset_test=dataset_test, 
+            N_fingerprints=N_fingerprints)

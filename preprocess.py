@@ -92,13 +92,6 @@ def create_dataset(filename, args):
 
     return dataset
 
-'''Initialize x_dict, in which each key is a symbol type
-(e.g., atom and chemical bond) and each value is its index.'''
-atom_dict = defaultdict(lambda: len(atom_dict))
-bond_dict = defaultdict(lambda: len(bond_dict))
-fingerprint_dict = defaultdict(lambda: len(fingerprint_dict))
-edge_dict = defaultdict(lambda: len(edge_dict))
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # classification target is a binary value (e.g., drug or not).
@@ -108,9 +101,16 @@ if __name__ == '__main__':
     parser.add_argument('--radius', default=1)
     args = parser.parse_args()
 
-    filename = 'dataset/%s-%s.npz' % (args.task, args.dataset)
+    filename = 'dataset/%s.npz' % args.dataset
 
     print('Preprocessing the %s dataset.' % args.dataset)
+
+    '''Initialize x_dict, in which each key is a symbol type
+    (e.g., atom and chemical bond) and each value is its index.'''
+    atom_dict = defaultdict(lambda: len(atom_dict))
+    bond_dict = defaultdict(lambda: len(bond_dict))
+    fingerprint_dict = defaultdict(lambda: len(fingerprint_dict))
+    edge_dict = defaultdict(lambda: len(edge_dict))
 
     dataset_train = create_dataset('data_train.txt', args)
     property = [float(data[3]) for data in dataset_train]

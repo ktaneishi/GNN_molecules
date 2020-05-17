@@ -74,7 +74,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using %s device.' % device)
 
-    filename = 'dataset/%s-%s.npz' %(args.task, args.dataset)
+    filename = 'dataset/%s.npz' % args.dataset
     dataset_train, dataset_test, N_fingerprints = np.load(filename, allow_pickle=True).values()
 
     for dataset_ in [dataset_train, dataset_test]:

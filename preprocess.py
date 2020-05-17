@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.model_selection import train_test_split
 from collections import defaultdict
 import argparse
 
@@ -62,13 +63,13 @@ def extract_fingerprints(radius, atoms, i_jbond_dict, fingerprint_dict, edge_dic
 
     return np.array(nodes)
 
-def create_dataset(filename, args):
+def create_dataset(args):
     from rdkit import Chem
 
     dataset = []
 
     # Load a dataset.
-    with open('dataset/%s/%s/%s' % (args.task, args.dataset, filename), 'r') as f:
+    with open('dataset/%s.txt' % args.dataset, 'r') as f:
         lines = f.readlines()
 
         for index, line in enumerate(lines, 1):
@@ -112,15 +113,12 @@ if __name__ == '__main__':
     fingerprint_dict = defaultdict(lambda: len(fingerprint_dict))
     edge_dict = defaultdict(lambda: len(edge_dict))
 
-    dataset_train = create_dataset('data_train.txt', args)
-    property = [float(data[3]) for data in dataset_train]
+    dataset = create_dataset(args)
+    property = [float(data[3]) for data in dataset]
     if len(np.unique(property)) == 2:
-        print(' positive ratio %4.1f%%' % (sum(property) / len(dataset_train) * 100))
+        print(' positive ratio %4.1f%%' % (sum(property) / len(dataset) * 100))
 
-    dataset_test = create_dataset('data_test.txt', args)
-    property = [float(data[3]) for data in dataset_test]
-    if len(np.unique(property)) == 2:
-        print(' positive ratio %4.1f%%' % (sum(property) / len(dataset_test) * 100))
+    dataset_train, dataset_test = train_test_split(dataset, train_size=0.8, test_size=0.2, shuffle=True, stratify=property)
 
     N_fingerprints = len(fingerprint_dict)
 

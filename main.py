@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch
-from sklearn.metrics import precision_score, recall_score
+from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score
 import argparse
 import timeit
 
@@ -24,7 +24,8 @@ def train(dataset, model, optimizer, loss_function, batch_train, epoch):
         optimizer.step()
         train_loss += loss.item()
         
-        print('\repoch %4d batch %4d train_loss %5.3f' % (epoch, batch_index, train_loss / batch_index), end='')
+        print('\repoch %4d batch %4d/%4d train_loss %5.3f' % \
+                (epoch, batch_index, np.ceil(len(dataset) / batch_train), train_loss / batch_index), end='')
 
 def test(dataset, model, loss_function, batch_test):
     y_score, y_true = [], []
@@ -47,7 +48,7 @@ def test(dataset, model, loss_function, batch_test):
     y_score = np.concatenate(y_score)
     y_true = np.concatenate(y_true)
 
-    return y_score, y_true
+    return y_score, y_true, test_loss / batch_index
 
 def main():
     parser = argparse.ArgumentParser()
@@ -96,7 +97,6 @@ def main():
     print('# of training data samples:', len(dataset_train))
     print('# of test data samples:', len(dataset_test))
 
-    print('Creating a model.')
     n_output = 1 if args.task == 'regression' else 2
     model = MolecularGraphNeuralNetwork(N_fingerprints, 
             dim=args.dim, layer_hidden=args.layer_hidden, layer_output=args.layer_output, n_output=n_output).to(device)
@@ -108,6 +108,8 @@ def main():
     if args.task == 'regression':
         loss_function = F.mse_loss
 
+    test_losses = [np.inf]
+
     for epoch in range(1, args.epochs+1):
         epoch_start = timeit.default_timer()
 
@@ -115,14 +117,16 @@ def main():
             optimizer.param_groups[0]['lr'] *= args.lr_decay
 
         train(dataset_train, model, optimizer, loss_function, args.batch_train, epoch)
-        y_score, y_true = test(dataset_test, model, loss_function, args.batch_test)
+        y_score, y_true, test_loss = test(dataset_test, model, loss_function, args.batch_test)
 
         if args.task == 'classification':
             y_pred = [np.argmax(x) for x in y_score]
             if len(np.unique(y_pred)) == 2:
+                acc = accuracy_score(y_true, y_pred)
+                auc = roc_auc_score(y_true, y_score[:,1])
                 prec = precision_score(y_true, y_pred)
                 recall = recall_score(y_true, y_pred)
-                print(' test_prec %5.3f test_recall %5.3f' % (prec, recall), end='')
+                print(' test_acc %5.3f test_auc %5.3f test_prec %5.3f test_recall %5.3f' % (acc, auc, prec, recall), end='')
 
         if args.task == 'regression':
             MAE = np.mean(np.abs(y_score - y_true))
@@ -130,6 +134,14 @@ def main():
             print(' test_MAE %5.3f' % (MAE), end='')
 
         print(' %5.1f sec' % (timeit.default_timer() - epoch_start))
+
+        test_losses.append(test_loss)
+
+        if test_loss < min(test_losses[:-1]):
+            torch.save(model.state_dict(), 'model.pth')
+
+        if min(test_losses) < min(test_losses[-10:]):
+            break
 
 if __name__ == '__main__':
     main()

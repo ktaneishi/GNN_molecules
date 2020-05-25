@@ -9,6 +9,33 @@ import timeit
 
 from model import MolecularGraphNeuralNetwork
 
+def data_load(args, device):
+    filename = 'dataset/%s.npz' % args.dataset
+    dataset_train, dataset_test, N_fingerprints = np.load(filename, allow_pickle=True).values()
+
+    '''Transform numpy data to torch tensor'''
+    for index, (fingerprints, adjacency, molecular_size, property) in enumerate(dataset_train):
+        fingerprints = torch.LongTensor(fingerprints).to(device)
+        adjacency = torch.FloatTensor(adjacency).to(device)
+        if args.task == 'classification':
+            property = torch.LongTensor([int(property)]).to(device)
+        if args.task == 'regression':
+            property = torch.FloatTensor([[float(property)]]).to(device)
+        dataset_train[index] = (fingerprints, adjacency, molecular_size, property)
+
+    for index, (fingerprints, adjacency, molecular_size, property) in enumerate(dataset_test):
+        fingerprints = torch.LongTensor(fingerprints).to(device)
+        adjacency = torch.FloatTensor(adjacency).to(device)
+        if args.task == 'classification':
+            property = torch.LongTensor([int(property)]).to(device)
+        if args.task == 'regression':
+            property = torch.FloatTensor([[float(property)]]).to(device)
+        dataset_test[index] = (fingerprints, adjacency, molecular_size, property)
+
+    np.random.shuffle(dataset_train)
+
+    return dataset_train, dataset_test, N_fingerprints
+
 def train(dataset, model, optimizer, loss_function, batch_train, epoch):
     train_loss = 0
     model.train()
@@ -28,7 +55,6 @@ def train(dataset, model, optimizer, loss_function, batch_train, epoch):
                 (epoch, batch_index, np.ceil(len(dataset) / batch_train), train_loss / batch_index), end='')
 
 def test(dataset, model, loss_function, batch_test):
-    y_score, y_true = [], []
     test_loss = 0
     model.eval()
 
@@ -40,22 +66,58 @@ def test(dataset, model, loss_function, batch_test):
         loss = loss_function(predicted, correct)
         test_loss += loss.item()
 
-        y_score.append(predicted.cpu())
-        y_true.append(correct.cpu())
-
     print(' test_loss %5.3f' % (test_loss / batch_index), end='')
 
-    y_score = np.concatenate(y_score)
-    y_true = np.concatenate(y_true)
+    return test_loss / batch_index
 
-    return y_score, y_true, test_loss / batch_index
+def main(args):
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
-def main():
+    device = torch.device('cuda' if not args.cpu and torch.cuda.is_available() else 'cpu')
+    print('Using %s device.' % device)
+
+    dataset_train, dataset_test, N_fingerprints = data_load(args, device)
+
+    print('# of training data samples:', len(dataset_train))
+    print('# of test data samples:', len(dataset_test))
+
+    n_output = 1 if args.task == 'regression' else 2
+    model = MolecularGraphNeuralNetwork(N_fingerprints, dim=args.dim, 
+            layer_hidden=args.layer_hidden, layer_output=args.layer_output, n_output=n_output).to(device)
+    print('# of model parameters:', sum([np.prod(p.size()) for p in model.parameters()]))
+
+    if args.modelfile:
+        model.load_state_dict(torch.load(args.modelfile))
+
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    loss_function = F.cross_entropy if args.task == 'classification' else F.mse_loss
+
+    test_losses = []
+
+    for epoch in range(args.epochs):
+        epoch_start = timeit.default_timer()
+
+        if epoch % args.decay_interval == 0:
+            optimizer.param_groups[0]['lr'] *= args.lr_decay
+
+        train(dataset_train, model, optimizer, loss_function, args.batch_train, epoch)
+        test_loss = test(dataset_test, model, loss_function, args.batch_test)
+
+        print(' %5.2f sec' % (timeit.default_timer() - epoch_start))
+
+        test_losses.append(test_loss)
+
+        if len(test_losses) > 1 and test_loss < min(test_losses[:-1]):
+            torch.save(model.state_dict(), 'model/%5.3f.pth' % test_loss)
+
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # classification target is a binary value (e.g., drug or not).
     # regression target is a real value (e.g., energy eV).
     parser.add_argument('--task', default='classification', choices=['classification', 'regression'])
     parser.add_argument('--dataset', default='hiv', choices=['hiv', 'photovoltaic'])
+    parser.add_argument('modelfile', nargs='?')
     parser.add_argument('--dim', default=50)
     parser.add_argument('--layer_hidden', default=6)
     parser.add_argument('--layer_output', default=6)
@@ -65,83 +127,9 @@ def main():
     parser.add_argument('--lr_decay', default=0.99)
     parser.add_argument('--decay_interval', default=10)
     parser.add_argument('--epochs', default=1000)
-    parser.add_argument('--random_seed', default=123)
-
+    parser.add_argument('--cpu', action='store_true')
+    parser.add_argument('--seed', default=123)
     args = parser.parse_args()
+    print(vars(args))
 
-    np.random.seed(args.random_seed)
-    torch.manual_seed(args.random_seed)
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print('Using %s device.' % device)
-
-    filename = 'dataset/%s.npz' % args.dataset
-    dataset_train, dataset_test, N_fingerprints = np.load(filename, allow_pickle=True).values()
-
-    for dataset_ in [dataset_train, dataset_test]:
-        for index, (fingerprints, adjacency, molecular_size, property) in enumerate(dataset_):
-            '''Transform numpy data to torch tensor'''
-            fingerprints = torch.LongTensor(fingerprints).to(device)
-            adjacency = torch.FloatTensor(adjacency).to(device)
-
-            if args.task == 'classification':
-                property = torch.LongTensor([int(property)]).to(device)
-
-            if args.task == 'regression':
-                property = torch.FloatTensor([[float(property)]]).to(device)
-
-            dataset_[index] = (fingerprints, adjacency, molecular_size, property)
-
-    np.random.shuffle(dataset_train)
-
-    print('# of training data samples:', len(dataset_train))
-    print('# of test data samples:', len(dataset_test))
-
-    n_output = 1 if args.task == 'regression' else 2
-    model = MolecularGraphNeuralNetwork(N_fingerprints, 
-            dim=args.dim, layer_hidden=args.layer_hidden, layer_output=args.layer_output, n_output=n_output).to(device)
-    print('# of model parameters:', sum([np.prod(p.size()) for p in model.parameters()]))
-
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    if args.task == 'classification':
-        loss_function = F.cross_entropy
-    if args.task == 'regression':
-        loss_function = F.mse_loss
-
-    test_losses = [np.inf]
-
-    for epoch in range(1, args.epochs+1):
-        epoch_start = timeit.default_timer()
-
-        if epoch % args.decay_interval == 0:
-            optimizer.param_groups[0]['lr'] *= args.lr_decay
-
-        train(dataset_train, model, optimizer, loss_function, args.batch_train, epoch)
-        y_score, y_true, test_loss = test(dataset_test, model, loss_function, args.batch_test)
-
-        if args.task == 'classification':
-            y_pred = [np.argmax(x) for x in y_score]
-            if len(np.unique(y_pred)) == 2:
-                acc = accuracy_score(y_true, y_pred)
-                auc = roc_auc_score(y_true, y_score[:,1])
-                prec = precision_score(y_true, y_pred)
-                recall = recall_score(y_true, y_pred)
-                print(' test_acc %5.3f test_auc %5.3f test_prec %5.3f test_recall %5.3f' % (acc, auc, prec, recall), end='')
-
-        if args.task == 'regression':
-            MAE = np.mean(np.abs(y_score - y_true))
-            # mean absolute error
-            print(' test_MAE %5.3f' % (MAE), end='')
-
-        print(' %5.1f sec' % (timeit.default_timer() - epoch_start))
-
-        test_losses.append(test_loss)
-
-        if test_loss < min(test_losses[:-1]):
-            torch.save(model.state_dict(), 'model.pth')
-
-        if min(test_losses) < min(test_losses[-10:]):
-            break
-
-if __name__ == '__main__':
-    main()
+    main(args)

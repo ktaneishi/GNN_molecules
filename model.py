@@ -12,7 +12,8 @@ class MolecularGraphNeuralNetwork(nn.Module):
         self.W_property = nn.Linear(dim, n_output)
 
     def pad(self, matrices, pad_value):
-        '''Pad the list of matrices with a pad_value (e.g., 0) for batch processing.
+        '''
+        Pad the list of matrices with a pad_value (e.g., 0) for batch processing.
         For example, given a list of matrices [A, B, C], we obtain a new matrix [A00, 0B0, 00C],
         where 0 is the zero (i.e., pad value) matrix.
         '''

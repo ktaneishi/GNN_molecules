@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch
-from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score
 import argparse
 import timeit
 

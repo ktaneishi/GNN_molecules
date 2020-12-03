@@ -35,33 +35,33 @@ def data_load(args, device):
 
     return dataset_train, dataset_test, N_fingerprints
 
-def train(dataset, model, optimizer, loss_function, batch_train, epoch):
+def train(dataset, net, optimizer, loss_function, batch_train, epoch):
     train_loss = 0
-    model.train()
+    net.train()
 
     for batch_index, index in enumerate(range(0, len(dataset), batch_train), 1):
         data_batch = list(zip(*dataset[index:index+batch_train]))
         correct = torch.cat(data_batch[-1])
 
         optimizer.zero_grad()
-        predicted = model.forward(data_batch)
+        predicted = net.forward(data_batch)
         loss = loss_function(predicted, correct)
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
         
-        print('\repoch %4d batch %4d/%4d train_loss %5.3f' % \
-                (epoch, batch_index, np.ceil(len(dataset) / batch_train), train_loss / batch_index), end='')
+    print('epoch %4d batch %4d/%4d train_loss %5.3f' % \
+            (epoch, batch_index, np.ceil(len(dataset) / batch_train), train_loss / batch_index), end='')
 
-def test(dataset, model, loss_function, batch_test):
+def test(dataset, net, loss_function, batch_test):
     test_loss = 0
-    model.eval()
+    net.eval()
 
     for batch_index, index in enumerate(range(0, len(dataset), batch_test), 1):
         data_batch = list(zip(*dataset[index:index+batch_test]))
         correct = torch.cat(data_batch[-1])
         with torch.no_grad():
-            predicted = model.forward(data_batch)
+            predicted = net.forward(data_batch)
         loss = loss_function(predicted, correct)
         test_loss += loss.item()
 
@@ -82,14 +82,14 @@ def main(args):
     print('# of test data samples:', len(dataset_test))
 
     n_output = 1 if args.task == 'regression' else 2
-    model = MolecularGraphNeuralNetwork(N_fingerprints, dim=args.dim, 
+    net = MolecularGraphNeuralNetwork(N_fingerprints, dim=args.dim, 
             layer_hidden=args.layer_hidden, layer_output=args.layer_output, n_output=n_output).to(device)
-    print('# of model parameters:', sum([np.prod(p.size()) for p in model.parameters()]))
+    print('# of model parameters:', sum([np.prod(p.size()) for p in net.parameters()]))
 
     if args.modelfile:
-        model.load_state_dict(torch.load(args.modelfile))
+        net.load_state_dict(torch.load(args.modelfile))
 
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = optim.Adam(net.parameters(), lr=args.lr)
     loss_function = F.cross_entropy if args.task == 'classification' else F.mse_loss
 
     test_losses = []
@@ -100,15 +100,15 @@ def main(args):
         if epoch % args.decay_interval == 0:
             optimizer.param_groups[0]['lr'] *= args.lr_decay
 
-        train(dataset_train, model, optimizer, loss_function, args.batch_train, epoch)
-        test_loss = test(dataset_test, model, loss_function, args.batch_test)
+        train(dataset_train, net, optimizer, loss_function, args.batch_train, epoch)
+        test_loss = test(dataset_test, net, loss_function, args.batch_test)
 
         print(' %5.2f sec' % (timeit.default_timer() - epoch_start))
 
         test_losses.append(test_loss)
 
         if len(test_losses) > 1 and test_loss < min(test_losses[:-1]):
-            torch.save(model.state_dict(), 'model/%5.3f.pth' % test_loss)
+            torch.save(net.state_dict(), 'model/%5.3f.pth' % test_loss)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -116,7 +116,7 @@ if __name__ == '__main__':
     # regression target is a real value (e.g., energy eV).
     parser.add_argument('--task', default='classification', choices=['classification', 'regression'])
     parser.add_argument('--dataset', default='hiv', choices=['hiv', 'photovoltaic'])
-    parser.add_argument('modelfile', nargs='?')
+    parser.add_argument('--modelfile', default=None)
     parser.add_argument('--dim', default=50)
     parser.add_argument('--layer_hidden', default=6)
     parser.add_argument('--layer_output', default=6)
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=1e-4)
     parser.add_argument('--lr_decay', default=0.99)
     parser.add_argument('--decay_interval', default=10)
-    parser.add_argument('--epochs', default=1000)
+    parser.add_argument('--epochs', default=1000, type=int)
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--seed', default=123)
     args = parser.parse_args()
